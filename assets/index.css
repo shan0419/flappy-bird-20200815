@@ -4,6 +4,8 @@
   height: 600px;
   background-image: url('../images/sky.png');
   background-position-x: 0;
+
+  overflow: hidden;
 }
 
 .bird {
@@ -51,6 +53,8 @@
   font-size: 20px;
   font-weight: bolder;
   color: #fff;
+
+  display: none;
 }
 
 .mask {
@@ -139,4 +143,20 @@
   font-size: 18px;
   font-weight: bolder;
   cursor: pointer;
+}
+
+.pipe {
+  position: absolute;
+  width: 52px;
+}
+
+.pipe.pipe-up {
+  top: 0;
+  background-image: url('../images/pipe2.png');
+  background-position-y: bottom;
+}
+
+.pipe.pipe-down {
+  bottom: 0;
+  background-image: url('../images/pipe1.png');
 }
