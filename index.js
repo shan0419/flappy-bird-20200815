@@ -12,6 +12,9 @@ var bird = {
   maxTop: 570,
   pipeLength: 7,
   pipeArr: [],
+  pipeLastIndex: 6,
+  score: 0,
+  scoreArr: [],
   // birdX: 0,
   init: function () {
     this.initData();
@@ -19,6 +22,11 @@ var bird = {
 
     this.handleStart();
     this.handleClick();
+    this.handleReStart();
+
+    if(sessionStorage.getItem('play')) {
+      this.start();
+    }
   },
   initData: function () {
     // this ？ bird
@@ -27,7 +35,18 @@ var bird = {
     this.oBird = this.el.getElementsByClassName('bird')[0];
     this.oStart = this.el.getElementsByClassName('start')[0];
     this.oScore = this.el.getElementsByClassName('score')[0];
+    this.oMask = this.el.getElementsByClassName('mask')[0];
+    this.oEnd = this.el.getElementsByClassName('end')[0];
+    this.oFinalScore = this.el.getElementsByClassName('final-score')[0];
+    this.oRankList = this.el.getElementsByClassName('rank-list')[0];
+    this.oRestart = this.el.getElementsByClassName('restart')[0];
 
+
+    this.scoreArr = this.getScore();
+  },
+  getScore: function () {
+    var scoreArr = getLocal('score');
+    return scoreArr ? scoreArr : [];
   },
   animate: function () {
     var count = 0;
@@ -69,6 +88,15 @@ var bird = {
     this.oBird.style.top = this.birdTop + 'px';
 
     this.judgeKnock();
+    this.addScore();
+  },
+  addScore: function () {
+    var index = this.score % this.pipeLength;
+    var pipeX = this.pipeArr[index].up.offsetLeft;
+
+    if(pipeX < 13) {
+      this.oScore.innerText = ++ this.score;
+    }
   },
   judgeKnock: function () {
     this.judgeBoundary();
@@ -79,7 +107,17 @@ var bird = {
       this.failGame();
     }
   },
-  judgePipe: function () {},
+  judgePipe: function () {
+    // 0 1 2 3 4 5 6 7 8 9 
+    var index = this.score % this.pipeLength;
+    var pipeX = this.pipeArr[index].up.offsetLeft;
+    var pipeY = this.pipeArr[index].y; // []
+    var birdY = this.birdTop;
+
+    if((pipeX <= 95 && pipeX >= 13) && (birdY <= pipeY[0] || birdY >= pipeY[1])) {
+      this.failGame();
+    }
+  },
   createPipe: function (x) {
     // Math.random() 0-1     0 - 100  50 - 150 50 - 225
     // 上下距离相等 150 
@@ -102,6 +140,7 @@ var bird = {
     this.pipeArr.push({
       up: oUpPipe,
       down: oDownPipe,
+      y: [upHeight, upHeight + 150 - 30],
     })
   },
   pipeMove: function () {
@@ -110,6 +149,15 @@ var bird = {
       var oDownPipe = this.pipeArr[i].down;
       var x = oUpPipe.offsetLeft - this.skyStep;
 
+      if(x < -52) {
+        var lastPipeLeft = this.pipeArr[this.pipeLastIndex].up.offsetLeft;
+        oUpPipe.style.left = lastPipeLeft + 300 + 'px';
+        oDownPipe.style.left = lastPipeLeft + 300 + 'px';
+
+        this.pipeLastIndex = i;
+
+        continue
+      }
 
       oUpPipe.style.left = x + 'px';
       oDownPipe.style.left = x + 'px';
@@ -125,19 +173,19 @@ var bird = {
   },
   handleStart: function () {
     var self = this;
+    this.oStart.onclick = this.start.bind(this);
+  },
+  start: function () {
+    var self = this;
+    self.startFlag = true;
+    self.oStart.style.display = 'none';
+    self.oScore.style.display = 'block';
+    self.oBird.style.left = '80px';
+    self.oBird.style.transition = 'none';
+    self.skyStep = 5;
 
-    this.oStart.onclick = function () {
-      // this == this.oStart
-      self.startFlag = true;
-      self.oStart.style.display = 'none';
-      self.oScore.style.display = 'block';
-      self.oBird.style.left = '80px';
-      self.oBird.style.transition = 'none';
-      self.skyStep = 5;
-
-      for(var i = 0; i < self.pipeLength; i ++) {
-        self.createPipe(300 *(i + 1));
-      }
+    for(var i = 0; i < self.pipeLength; i ++) {
+      self.createPipe(300 *(i + 1));
     }
   },
   handleClick: function () {
@@ -152,12 +200,114 @@ var bird = {
 
     };
   },
+  handleReStart: function () {
+    this.oRestart.onclick = function () {
+      sessionStorage.setItem('play', true);
+      window.location.reload();
+    };
+  },
   failGame: function () {
-    console.log('end');
     clearInterval(this.timer);
+    this.setScore();
+
+    // console.log(JSON.stringify(this.scoreArr));
+
+    this.oMask.style.display = 'block';
+    this.oEnd.style.display = 'block';
+    this.oBird.style.display = 'none';
+    this.oScore.style.display = 'none';
+    this.oFinalScore.innerText = this.score;
+
+    this.renderRankList();
+  },
+  setScore: function () {
+    this.scoreArr.push({
+      score: this.score,
+      time: this.getDate()
+    })
+
+    this.scoreArr.sort(function (a, b) {
+      return b.score - a.score;
+    })
+
+    var scoreLength = this.scoreArr.length;
+    this.scoreArr.length = scoreLength > 8 ? 8 : scoreLength;
+
+    setLocal('score', this.scoreArr);
+  },
+  getDate: function () {
+    var d = new Date();
+    var year = d.getFullYear();
+    var month = d.getMonth() + 1;
+    var day = d.getDate();
+    var hour = d.getHours();
+    var minute = d.getMinutes();
+    var second = d.getSeconds();
+
+    return `${year}.${month}.${day} ${hour}:${minute}:${second}`;
+  },
+  renderRankList: function () {
+    var template = '';
+
+    for(var i = 0; i < this.scoreArr.length; i ++) {
+      var scoreObj = this.scoreArr[i];
+      var degreeClass = '';
+      switch (i) {
+        case 0:
+          degreeClass = 'first';
+          break;
+        case 1:
+          degreeClass = 'second';
+          break;
+        case 2:
+          degreeClass = 'third';
+          break;
+      }
+      template += `
+        <li class="rank-item">
+          <span class="rank-degree ${degreeClass}">${i + 1}</span>
+          <span class="rank-score">${scoreObj.score}</span>
+          <span class="rank-time">${scoreObj.time}</span>
+        </li>
+      `;
+    }
+
+    this.oRankList.innerHTML = template;
   },
 };
+
+// dom.innerHTML = ;
+
+var c = 'ccc';
+var str = 'a' + c +'b'; // acccb
+
+
+// ab
+var c = 'ccc';
+var str = `a${c}b`;
 
 
 
 bird.init();
+
+// 8
+
+var score = [
+  {
+    score: 1,
+    time: '2020.8.18 20:48'
+  },{
+    score: 2,
+    time: 'xxx',
+  }
+];
+
+// 6
+
+// 1 2 3 4 5 6 0 
+
+// < 95
+// > 13
+
+// 13 - 95
+// upHeight, upHeight + 150
